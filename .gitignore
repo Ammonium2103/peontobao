@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+memory.db
+screenshot.png
+agent.log
+
+# Flutter
+jarvis_mobile/.dart_tool/
+jarvis_mobile/.flutter-plugins
+jarvis_mobile/.flutter-plugins-dependencies
+jarvis_mobile/.pub-cache/
+jarvis_mobile/.pub/
+jarvis_mobile/build/
+jarvis_mobile/android/local.properties

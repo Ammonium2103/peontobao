@@ -1,0 +1,10 @@
+Flutter App Setup:
+
+1. flutter create jarvis_app
+2. Add dependencies:
+   speech_to_text
+   flutter_tts
+   http
+
+3. Connect to server:
+   http://YOUR_IP:8000/agent
