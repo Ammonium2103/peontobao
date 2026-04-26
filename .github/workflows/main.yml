@@ -24,14 +24,18 @@ jobs:
       - name: Repair and Install Dependencies
         run: |
           cd jarvis_mobile
-          # Tu dong sua loi project neu thieu file he thong
+          # Xoa bo cac file cấu hình cá nhân nếu lỡ bị push lên
+          rm -f android/local.properties
           flutter create .
           flutter pub get
+
+      - name: Accept Android Licenses
+        run: yes | flutter doctor --android-licenses || true
 
       - name: Build APK
         run: |
           cd jarvis_mobile
-          flutter build apk --release
+          flutter build apk --release --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
