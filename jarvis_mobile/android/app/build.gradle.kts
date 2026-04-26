@@ -28,6 +28,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Support native ABIs
+        ndk.abiFilters.add("arm64-v8a")
+        ndk.abiFilters.add("armeabi-v7a")
     }
 
     buildTypes {
