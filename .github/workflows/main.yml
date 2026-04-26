@@ -3,6 +3,10 @@ on:
   push:
     branches: [ "master", "main" ]
 
+env:
+  # Ép toàn bộ các Actions chạy trên môi trường Node.js 24 theo yêu cầu của sếp
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,17 +20,19 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Hiện tại GitHub hỗ trợ tối đa bản 20/22 ổn định, nhưng biến môi trường trên sẽ kích hoạt nhân Node 24 bên dưới
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Repair and Install Dependencies
+      - name: Install Dependencies
         run: |
           cd jarvis_mobile
-          # Xoa bo cac file cấu hình cá nhân nếu lỡ bị push lên
-          rm -f android/local.properties
-          flutter create .
           flutter pub get
 
       - name: Accept Android Licenses
@@ -35,7 +41,7 @@ jobs:
       - name: Build APK
         run: |
           cd jarvis_mobile
-          flutter build apk --release --verbose
+          flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
