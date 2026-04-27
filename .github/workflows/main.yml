@@ -33,7 +33,8 @@ jobs:
       - name: Install Dependencies
         run: |
           cd jarvis_mobile
-          flutter pub upgrade --major-versions
+          flutter clean
+          flutter pub upgrade
           flutter pub get
 
       - name: Accept Android Licenses
