@@ -5,77 +5,101 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:avatar_glow/avatar_glow.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
 
-void main() => runApp(const JarvisAIApp());
+void main() => runApp(const JarvisStandaloneApp());
 
-class JarvisMobileTheme {
-  static const primaryColor = Color(0xFF00E5FF); // Neon Cyan
+class JarvisTheme {
+  static const primaryColor = Color(0xFF00E5FF);
   static const bgColor = Color(0xFF0A0E14);
   static const cardColor = Color(0xFF161B22);
 }
 
-class JarvisAIApp extends StatelessWidget {
-  const JarvisAIApp({super.key});
+class JarvisStandaloneApp extends StatelessWidget {
+  const JarvisStandaloneApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: JarvisMobileTheme.bgColor,
-        primaryColor: JarvisMobileTheme.primaryColor,
+        scaffoldBackgroundColor: JarvisTheme.bgColor,
+        primaryColor: JarvisTheme.primaryColor,
       ),
-      home: const JarvisBrainCenter(),
+      home: const JarvisCoreScreen(),
     );
   }
 }
 
-class JarvisBrainCenter extends StatefulWidget {
-  const JarvisBrainCenter({super.key});
+class JarvisCoreScreen extends StatefulWidget {
+  const JarvisCoreScreen({super.key});
   @override
-  State<JarvisBrainCenter> createState() => _JarvisBrainCenterState();
+  State<JarvisCoreScreen> createState() => _JarvisCoreScreenState();
 }
 
-class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
+class _JarvisCoreScreenState extends State<JarvisCoreScreen> {
+  // AI Engines
   late stt.SpeechToText _speech;
   late FlutterTts _tts;
   bool _isListening = false;
-  String _textText = "Nhấn micro để ra lệnh, sếp!";
-  String _aiResponse = "Hệ thống đã sẵn sàng.";
-  String _serverIp = "192.168.1.15"; 
-  final TextEditingController _ipController = TextEditingController();
+  String _userText = "Nhấn để nói, sếp!";
+  String _jarvisText = "Hệ thống Standalone đã sẵn sàng. Tôi đang chạy trực tiếp trên điện thoại của sếp.";
+  
+  // Local Memory (SQLite)
+  late Database _db;
+  List<Map<String, String>> _history = [];
+
+  // NVIDIA Neural Link (Thay key của sếp vào đây)
+  final String _nvidiaApiKey = "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";
 
   @override
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
     _tts = FlutterTts();
-    _setupTts();
+    _initNeuralMemory();
+    _setupVoice();
   }
 
-  void _setupTts() async {
+  Future<void> _initNeuralMemory() async {
+    _db = await openDatabase(
+      p.join(await getDatabasesPath(), 'jarvis_memory.db'),
+      onCreate: (db, version) => db.execute("CREATE TABLE memory(id INTEGER PRIMARY KEY, role TEXT, content TEXT)"),
+      version: 1,
+    );
+    _loadHistory();
+  }
+
+  void _loadHistory() async {
+    final List<Map<String, dynamic>> maps = await _db.query('memory', orderBy: 'id DESC', limit: 6);
+    setState(() {
+      _history = List.generate(maps.length, (i) => {
+        'role': maps[i]['role'] as String,
+        'content': maps[i]['content'] as String,
+      }).reversed.toList();
+    });
+  }
+
+  void _setupVoice() async {
     await _tts.setLanguage("vi-VN");
-    await _tts.setPitch(1.0);
     await _tts.setSpeechRate(0.5);
-  }
-
-  Future<void> _speak(String text) async {
-    await _tts.speak(text);
   }
 
   void _listen() async {
     if (!_isListening) {
-      bool available = await _speech.initialize();
-      if (available) {
-        setState(() => _isListening = true);
-        _speech.listen(
-          onResult: (val) => setState(() {
-            _textText = val.recognizedWords;
+      if (await Permission.microphone.request().isGranted) {
+        bool available = await _speech.initialize();
+        if (available) {
+          setState(() => _isListening = true);
+          _speech.listen(onResult: (val) {
+            setState(() => _userText = val.recognizedWords);
             if (val.finalResult) {
-              _isListening = false;
-              _sendCommand(_textText);
+              setState(() => _isListening = false);
+              _processWithAI(_userText);
             }
-          }),
-        );
+          });
+        }
       }
     } else {
       setState(() => _isListening = false);
@@ -83,23 +107,47 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
     }
   }
 
-  Future<void> _sendCommand(String text) async {
+  Future<void> _processWithAI(String text) async {
+    setState(() => _jarvisText = "Đang suy luận...");
+
     try {
+      final url = Uri.parse('https://integrate.api.nvidia.com/v1/chat/completions');
+      
+      // Prompt Engineering: Personality & Autonomy
+      final messages = [
+        {"role": "system", "content": "You are JARVIS, a helpful and witty AI assistant running standalone on a mobile device. Your responses should be professional yet warm. Always speak in Vietnamese."},
+        ..._history,
+        {"role": "user", "content": text}
+      ];
+
       final response = await http.post(
-        Uri.parse('http://$_serverIp:8000/agent'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'text': text, 'source': 'mobile'}),
-      ).timeout(const Duration(seconds: 15));
+        url,
+        headers: {
+          'Authorization': 'Bearer $_nvidiaApiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          "model": "meta/llama-3.1-70b-instruct",
+          "messages": messages,
+          "temperature": 0.5,
+          "max_tokens": 512,
+        }),
+      ).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _aiResponse = data['response'];
-        });
-        _speak(_aiResponse);
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        String aiResponse = data['choices'][0]['message']['content'];
+
+        // Save to Local Memory
+        await _db.insert('memory', {'role': 'user', 'content': text});
+        await _db.insert('memory', {'role': 'assistant', 'content': aiResponse});
+        _loadHistory();
+
+        setState(() => _jarvisText = aiResponse);
+        await _tts.speak(aiResponse);
       }
     } catch (e) {
-      setState(() => _aiResponse = "Kết nối thất bại. Kiểm tra Server!");
+      setState(() => _jarvisText = "Kết nối Neural Link bị gián đoạn. Kiểm tra Internet, sếp!");
     }
   }
 
@@ -108,63 +156,54 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: FadeInDown(child: const Text("JARVIS CORE v3.0", style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold))),
+        title: const Text("JARVIS STANDALONE", style: TextStyle(letterSpacing: 3)),
         centerTitle: true,
-        actions: [
-          IconButton(icon: const Icon(Icons.hub_outlined, color: JarvisMobileTheme.primaryColor), onPressed: _showSettings)
-        ],
       ),
       body: Column(
         children: [
-          const SizedBox(height: 20),
-          Expanded(
-            flex: 3,
-            child: Center(
-              child: AvatarGlow(
-                animate: _isListening,
-                glowColor: JarvisMobileTheme.primaryColor,
-                duration: const Duration(milliseconds: 2000),
-                repeat: true,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: JarvisMobileTheme.primaryColor.withOpacity(0.5), width: 2),
-                    gradient: RadialGradient(colors: [JarvisMobileTheme.primaryColor.withOpacity(0.2), Colors.transparent]),
-                  ),
-                  child: Icon(
-                    _isListening ? Icons.graphic_eq : Icons.bolt,
-                    size: 80,
-                    color: JarvisMobileTheme.primaryColor,
-                  ),
+          const SizedBox(height: 30),
+          // Neural Visualizer
+          AvatarGlow(
+            animate: _isListening,
+            glowColor: JarvisTheme.primaryColor,
+            child: GestureDetector(
+              onTap: _listen,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: JarvisTheme.primaryColor, width: 2),
+                  gradient: const RadialGradient(colors: [Color(0x3300E5FF), Colors.transparent]),
                 ),
+                child: Icon(_isListening ? Icons.mic : Icons.bolt, size: 60, color: JarvisTheme.primaryColor),
               ),
             ),
           ),
+          
+          const SizedBox(height: 40),
+          
+          // AI Interaction Terminal
           Expanded(
-            flex: 2,
             child: FadeInUp(
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(20),
+                margin: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(25),
                 decoration: BoxDecoration(
-                  color: JarvisMobileTheme.cardColor,
-                  borderRadius: BorderRadius.circular(25),
+                  color: JarvisTheme.cardColor,
+                  borderRadius: BorderRadius.circular(30),
                   border: Border.all(color: Colors.white10),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10)],
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("USER: $_textText", style: const TextStyle(color: Colors.white54, fontSize: 14)),
-                    const Divider(color: Colors.white10, height: 20),
+                    Text("BOSS: $_userText", style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                    const Divider(color: Colors.white10, height: 30),
                     Expanded(
                       child: SingleChildScrollView(
                         child: Text(
-                          _aiResponse,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w300),
+                          _jarvisText,
+                          style: const TextStyle(fontSize: 18, height: 1.5, fontWeight: FontWeight.w300),
                         ),
                       ),
                     ),
@@ -173,36 +212,19 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
               ),
             ),
           ),
-          const SizedBox(height: 30),
+          
+          // Clear Memory Button
           Padding(
-            padding: const EdgeInsets.only(bottom: 50),
-            child: FloatingActionButton.large(
-              onPressed: _listen,
-              backgroundColor: _isListening ? Colors.redAccent : JarvisMobileTheme.primaryColor,
-              child: Icon(_isListening ? Icons.stop : Icons.mic, size: 40, color: Colors.black),
+            padding: const EdgeInsets.only(bottom: 40),
+            child: TextButton.icon(
+              onPressed: () {
+                _db.delete('memory');
+                _loadHistory();
+              },
+              icon: const Icon(Icons.delete_sweep, color: Colors.white24),
+              label: const Text("XÓA KÝ ỨC", style: TextStyle(color: Colors.white24)),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSettings() {
-    _ipController.text = _serverIp;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: JarvisMobileTheme.cardColor,
-        title: const Text("Cấu hình Neural Link"),
-        content: TextField(
-          controller: _ipController,
-          decoration: const InputDecoration(hintText: "Nhập IP Server (vd: 192.168.1.15)"),
-        ),
-        actions: [
-          TextButton(onPressed: () {
-            setState(() => _serverIp = _ipController.text);
-            Navigator.pop(context);
-          }, child: const Text("LƯU", style: TextStyle(color: JarvisMobileTheme.primaryColor)))
+          )
         ],
       ),
     );
