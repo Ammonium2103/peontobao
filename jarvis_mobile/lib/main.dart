@@ -36,15 +36,12 @@ class JarvisBrainCenter extends StatefulWidget {
 }
 
 class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
-  // AI & Voice Engines
   late stt.SpeechToText _speech;
   late FlutterTts _tts;
   bool _isListening = false;
   String _textText = "Nhấn micro để ra lệnh, sếp!";
   String _aiResponse = "Hệ thống đã sẵn sàng.";
-  
-  // Connection
-  String _serverIp = "192.168.1.15"; // SẾP NHỚ THAY IP NÀY
+  String _serverIp = "192.168.1.15"; 
   final TextEditingController _ipController = TextEditingController();
 
   @override
@@ -92,7 +89,7 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
         Uri.parse('http://$_serverIp:8000/agent'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'text': text, 'source': 'mobile'}),
-      ).timeout(const Duration(seconds: 12));
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -121,7 +118,6 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
       body: Column(
         children: [
           const SizedBox(height: 20),
-          // AI Visualization Area
           Expanded(
             flex: 3,
             child: Center(
@@ -147,8 +143,6 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
               ),
             ),
           ),
-          
-          // Response Display (Glassmorphism style)
           Expanded(
             flex: 2,
             child: FadeInUp(
@@ -179,22 +173,13 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
               ),
             ),
           ),
-          
           const SizedBox(height: 30),
-          
-          // Micro Action Button
           Padding(
             padding: const EdgeInsets.only(bottom: 50),
-            child: GestureDetector(
-              onLongPress: _listen,
-              onLongPressUp: () {
-                if (_isListening) _listen();
-              },
-              child: FloatingActionButton.large(
-                onPressed: _listen,
-                backgroundColor: _isListening ? Colors.redAccent : JarvisMobileTheme.primaryColor,
-                child: Icon(_isListening ? Icons.stop : Icons.mic, size: 40, color: Colors.black),
-              ),
+            child: FloatingActionButton.large(
+              onPressed: _listen,
+              backgroundColor: _isListening ? Colors.redAccent : JarvisMobileTheme.primaryColor,
+              child: Icon(_isListening ? Icons.stop : Icons.mic, size: 40, color: Colors.black),
             ),
           ),
         ],
