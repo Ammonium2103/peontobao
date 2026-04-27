@@ -109,7 +109,7 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: FadeInDown(child: Text("JARVIS CORE v3.0", style: const TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold))),
+        title: FadeInDown(child: const Text("JARVIS CORE v3.0", style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold))),
         centerTitle: true,
         actions: [
           IconButton(icon: const Icon(Icons.hub_outlined, color: JarvisMobileTheme.primaryColor), onPressed: _showSettings)
