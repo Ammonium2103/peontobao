@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.jarvis_mobile"
-    compileSdk = 35
+    compileSdk = 34
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -21,16 +21,14 @@ android {
     defaultConfig {
         applicationId = "com.example.jarvis_mobile"
         minSdk = 21
-        targetSdk = 35
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
-        // Kích hoạt MultiDex để chứa được nhiều thư viện AI
         multiDexEnabled = true
         
         ndk {
-            abiFilters.add("arm64-v8a")
-            abiFilters.add("armeabi-v7a")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 
