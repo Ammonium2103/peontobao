@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
@@ -10,231 +11,277 @@ import 'package:animate_do/animate_do.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 
-void main() => runApp(const JarvisVoiceApp());
+void main() => runApp(const JarvisFuturisticApp());
 
-class JarvisTheme {
-  static const primaryColor = Color(0xFF00E5FF);
-  static const bgColor = Color(0xFF0A0E14);
-  static const cardColor = Color(0xFF161B22);
+class JColor {
+  static const primary = Color(0xFF00FBFF);
+  static const secondary = Color(0xFF0077B6);
+  static const background = Color(0xFF02040F);
+  static const card = Color(0xFF0D1B2A);
+  static const accent = Color(0xFFE0E1DD);
 }
 
-class JarvisVoiceApp extends StatelessWidget {
-  const JarvisVoiceApp({super.key});
+class JarvisFuturisticApp extends StatelessWidget {
+  const JarvisFuturisticApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: JarvisTheme.bgColor,
-        primaryColor: JarvisTheme.primaryColor,
+        scaffoldBackgroundColor: JColor.background,
+        primaryColor: JColor.primary,
       ),
-      home: const JarvisVoiceCore(),
+      home: const JarvisHUD(),
     );
   }
 }
 
-class JarvisVoiceCore extends StatefulWidget {
-  const JarvisVoiceCore({super.key});
+class JarvisHUD extends StatefulWidget {
+  const JarvisHUD({super.key});
   @override
-  State<JarvisVoiceCore> createState() => _JarvisVoiceCoreState();
+  State<JarvisHUD> createState() => _JarvisHUDState();
 }
 
-class _JarvisVoiceCoreState extends State<JarvisVoiceCore> {
-  // Engines
+class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMixin {
   final _audioRecorder = AudioRecorder();
-  final _audioPlayer = AudioPlayer();
   bool _isRecording = false;
-  String _userText = "Giữ để nói chuyện với Jarvis...";
-  String _jarvisText = "Tôi đang lắng nghe, thưa sếp.";
+  String _userText = "Awaiting command...";
+  String _aiText = "System Online. Standby for orders, Boss.";
   
-  // Connection (Standalone Mode - Direct to Cloud via Python Gateway)
-  final String _serverUrl = "http://192.168.1.15:8000"; // THAY IP CỦA SẾP
-  
+  final String _serverUrl = "http://192.168.1.15:8000"; // SẾP NHỚ THAY IP
   late Database _db;
-  List<Map<String, String>> _history = [];
+  late AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
     _initMemory();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   Future<void> _initMemory() async {
     _db = await openDatabase(
-      p.join(await getDatabasesPath(), 'jarvis_v6.db'),
+      p.join(await getDatabasesPath(), 'jarvis_hud.db'),
       onCreate: (db, version) => db.execute("CREATE TABLE memory(id INTEGER PRIMARY KEY, role TEXT, content TEXT)"),
       version: 1,
     );
-    _loadHistory();
   }
 
-  void _loadHistory() async {
-    final List<Map<String, dynamic>> maps = await _db.query('memory', orderBy: 'id DESC', limit: 5);
-    setState(() {
-      _history = List.generate(maps.length, (i) => {
-        'role': maps[i]['role'] as String,
-        'content': maps[i]['content'] as String,
-      }).reversed.toList();
-    });
+  Future<void> _launchApp(String name) async {
+    final Map<String, String> apps = {
+      'zalo': 'https://zalo.me',
+      'facebook': 'https://facebook.com',
+      'youtube': 'https://youtube.com',
+      'mess': 'https://messenger.com',
+    };
+    
+    String? target = apps[name.toLowerCase()];
+    if (target != null) {
+      final uri = Uri.parse(target);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
   }
 
-  Future<void> _startRecording() async {
+  void _checkShortcuts(String text) {
+    String lower = text.toLowerCase();
+    if (lower.contains("zalo")) _launchApp("zalo");
+    if (lower.contains("facebook")) _launchApp("facebook");
+    if (lower.contains("youtube")) _launchApp("youtube");
+  }
+
+  Future<void> _startVoice() async {
     if (await Permission.microphone.request().isGranted) {
       final dir = await getApplicationDocumentsDirectory();
-      final path = p.join(dir.path, 'audio.m4a');
-      
+      final path = p.join(dir.path, 'cmd.m4a');
       await _audioRecorder.start(const RecordConfig(), path: path);
       setState(() {
         _isRecording = true;
-        _userText = "Đang lắng nghe sếp...";
+        _userText = "Listening...";
       });
     }
   }
 
-  Future<void> _stopRecording() async {
+  Future<void> _stopVoice() async {
     final path = await _audioRecorder.stop();
     setState(() => _isRecording = false);
-    if (path != null) {
-      _processAudio(path);
-    }
+    if (path != null) _processVoice(path);
   }
 
-  Future<void> _processAudio(String path) async {
-    setState(() => _jarvisText = "Đang giải mã giọng nói (Whisper)...");
-    
+  Future<void> _processVoice(String path) async {
+    setState(() => _aiText = "Decoding Neural Signal...");
     try {
-      // 1. Send Audio to Whisper (Python Server Gateway)
       var request = http.MultipartRequest('POST', Uri.parse('$_serverUrl/stt'));
       request.files.add(await http.MultipartFile.fromPath('file', path));
-      
       var response = await request.send();
-      var responseData = await response.stream.bytesToString();
-      var result = jsonDecode(responseData);
+      var result = jsonDecode(await response.stream.bytesToString());
       String transcript = result['text'];
 
       if (transcript.isNotEmpty) {
         setState(() => _userText = transcript);
+        _checkShortcuts(transcript);
         _getAIResponse(transcript);
       }
     } catch (e) {
-      setState(() => _jarvisText = "Lỗi Whisper: Không thể kết nối tới Server.");
+      setState(() => _aiText = "Communication Link Severed.");
     }
   }
 
   Future<void> _getAIResponse(String text) async {
-    setState(() => _jarvisText = "Jarvis đang suy nghĩ...");
-    
     try {
       final response = await http.post(
         Uri.parse('$_serverUrl/chat'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'text': text}),
       );
-
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        String aiResponse = data['response'];
-
-        await _db.insert('memory', {'role': 'user', 'content': text});
-        await _db.insert('memory', {'role': 'assistant', 'content': aiResponse});
-        _loadHistory();
-
-        setState(() => _jarvisText = aiResponse);
-        
-        // ML Engineer Tip: ElevenLabs voice should be generated on server or client.
-        // For simplicity, we use local TTS here, or can be upgraded to stream ElevenLabs audio.
+        setState(() => _aiText = data['response']);
+        _checkShortcuts(_aiText);
       }
     } catch (e) {
-      setState(() => _jarvisText = "Mất kết nối với Neural Core.");
+      setState(() => _aiText = "Core Processor Error.");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [JarvisTheme.bgColor, Color(0xFF001219)],
+      body: Stack(
+        children: [
+          // Background HUD Layer
+          Positioned.fill(child: _buildHUDBackground()),
+          
+          Column(
+            children: [
+              const SizedBox(height: 60),
+              _buildTopHeader(),
+              const Spacer(),
+              _buildNeuralCenter(),
+              const Spacer(),
+              _buildConsoleBox(),
+              _buildMicButton(),
+              const SizedBox(height: 50),
+            ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHUDBackground() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment.center,
+          colors: [JColor.secondary.withOpacity(0.1), JColor.background],
+          radius: 1.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopHeader() {
+    return FadeInDown(
+      child: Column(
+        children: [
+          Text("STRATEGIC DEFENSE SYSTEM", style: TextStyle(color: JColor.primary.withOpacity(0.5), fontSize: 10, letterSpacing: 2)),
+          const Text("JARVIS HUD v7.0", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 8, color: JColor.primary)),
+          const SizedBox(height: 5),
+          Container(height: 1, width: 200, color: JColor.primary.withOpacity(0.3)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNeuralCenter() {
+    return Center(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Rotating Outer Ring
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (_, child) => Transform.rotate(angle: _controller.value * 2 * math.pi, child: child),
+            child: Container(
+              width: 250, height: 250,
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: JColor.primary.withOpacity(0.1), width: 15)),
+            ),
+          ),
+          // Pulsing Core
+          AvatarGlow(
+            animate: _isRecording,
+            glowColor: JColor.primary,
+            child: SpinKitPulse(color: JColor.primary, size: 150),
+          ),
+          const Icon(Icons.shield_outlined, color: JColor.primary, size: 60),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConsoleBox() {
+    return FadeInUp(
+      child: Container(
+        margin: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
+        height: 220,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: JColor.card.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: JColor.primary.withOpacity(0.2)),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 80),
-            FadeInDown(
-              child: const Text("JARVIS v6.0", style: TextStyle(fontSize: 24, letterSpacing: 5, fontWeight: FontWeight.bold, color: JarvisTheme.primaryColor)),
+            Row(
+              children: [
+                const Icon(Icons.terminal, size: 14, color: JColor.primary),
+                const SizedBox(width: 8),
+                Text("NEURAL_LINK_STREAM", style: TextStyle(color: JColor.primary.withOpacity(0.7), fontSize: 10)),
+              ],
             ),
-            const SizedBox(height: 50),
-            
-            // Central Neural Ring
+            const Divider(color: Colors.white10),
+            Text("USER >> $_userText", style: const TextStyle(color: JColor.primary, fontSize: 13, fontFamily: 'monospace')),
+            const SizedBox(height: 10),
             Expanded(
-              child: Center(
-                child: AvatarGlow(
-                  animate: _isRecording,
-                  glowColor: JarvisTheme.primaryColor,
-                  duration: const Duration(milliseconds: 1000),
-                  child: Container(
-                    width: 180,
-                    height: 180,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: JarvisTheme.primaryColor.withOpacity(0.3), width: 4),
-                      boxShadow: [BoxShadow(color: JarvisTheme.primaryColor.withOpacity(0.2), blurRadius: 30)],
-                    ),
-                    child: const Icon(Icons.blur_on, size: 100, color: JarvisTheme.primaryColor),
-                  ),
-                ),
-              ),
-            ),
-
-            // AI Console
-            FadeInUp(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(25),
-                height: 250,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: JarvisTheme.cardColor.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("BOSS: $_userText", style: const TextStyle(color: Colors.white38, fontSize: 13)),
-                      const SizedBox(height: 15),
-                      const Divider(color: Colors.white10),
-                      const SizedBox(height: 15),
-                      Text(
-                        _jarvisText,
-                        style: const TextStyle(fontSize: 18, height: 1.6, fontWeight: FontWeight.w300),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Recording Trigger
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 60),
-              child: GestureDetector(
-                onTapDown: (_) => _startRecording(),
-                onTapUp: (_) => _stopRecording(),
-                child: FloatingActionButton.large(
-                  onPressed: () {}, // Handled by GestureDetector
-                  backgroundColor: _isRecording ? Colors.redAccent : JarvisTheme.primaryColor,
-                  child: Icon(_isRecording ? Icons.mic : Icons.mic_none, size: 45, color: Colors.black),
+              child: SingleChildScrollView(
+                child: Text(
+                  "JARVIS >> $_aiText",
+                  style: const TextStyle(color: JColor.accent, fontSize: 16, height: 1.5, fontWeight: FontWeight.w300),
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMicButton() {
+    return GestureDetector(
+      onTapDown: (_) => _startVoice(),
+      onTapUp: (_) => _stopVoice(),
+      child: Container(
+        width: 90, height: 90,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: _isRecording ? Colors.red.withOpacity(0.2) : JColor.primary.withOpacity(0.1),
+          border: Border.all(color: _isRecording ? Colors.red : JColor.primary, width: 2),
+          boxShadow: [BoxShadow(color: (_isRecording ? Colors.red : JColor.primary).withOpacity(0.3), blurRadius: 20)],
+        ),
+        child: Icon(_isRecording ? Icons.mic : Icons.mic_none, size: 40, color: _isRecording ? Colors.red : JColor.primary),
       ),
     );
   }

@@ -1,7 +1,7 @@
 name: jarvis_mobile
-description: Standalone Voice-Enabled Jarvis AI.
+description: Futuristic Standalone Voice Jarvis AI.
 publish_to: 'none'
-version: 6.0.0+1
+version: 7.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -20,6 +20,8 @@ dependencies:
   record: ^5.1.0
   audioplayers: ^5.2.1
   path_provider: ^2.1.2
+  url_launcher: ^6.2.5
+  flutter_spinkit: ^5.2.1
 
 dev_dependencies:
   flutter_test:
