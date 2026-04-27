@@ -53,7 +53,7 @@ class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMix
   
   // NVIDIA & OpenAI Direct Neural Links
   final String _nvidiaApiKey = "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";
-  final String _openaiApiKey = "sk-...."; // SẾP NHỚ THAY OPENAI KEY ĐỂ DÙNG WHISPER
+  final String _openaiApiKey = "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";
 
   late Database _db;
   List<Map<String, String>> _history = [];
