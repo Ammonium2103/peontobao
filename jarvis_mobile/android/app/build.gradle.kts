@@ -24,11 +24,21 @@ android {
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Kích hoạt MultiDex để chứa được nhiều thư viện AI
+        multiDexEnabled = true
+        
+        ndk {
+            abiFilters.add("arm64-v8a")
+            abiFilters.add("armeabi-v7a")
+        }
     }
 
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
+            minifyEnabled = false
+            shrinkResources = false
         }
     }
 }
