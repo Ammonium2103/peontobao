@@ -112,7 +112,7 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: FadeInDown(child: const Text("JARVIS CORE v2.0", style: TextStyle(letterSpacing: 2, fontWeight: TextStyle.bold))),
+        title: FadeInDown(child: const Text("JARVIS CORE v2.0", style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold))),
         centerTitle: true,
         actions: [
           IconButton(icon: const Icon(Icons.hub_outlined, color: JarvisMobileTheme.primaryColor), onPressed: _showSettings)
@@ -134,7 +134,7 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
                   width: 200,
                   height: 200,
                   decoration: BoxDecoration(
-                    shape: BoxType.circle,
+                    shape: BoxShape.circle,
                     border: Border.all(color: JarvisMobileTheme.primaryColor.withOpacity(0.5), width: 2),
                     gradient: RadialGradient(colors: [JarvisMobileTheme.primaryColor.withOpacity(0.2), Colors.transparent]),
                   ),
@@ -169,8 +169,8 @@ class _JarvisBrainCenterState extends State<JarvisBrainCenter> {
                       child: SingleChildScrollView(
                         child: Text(
                           _aiResponse,
-                          textAlign: BoxTextAlign.center,
-                          style: const TextStyle(fontSize: 18, fontWeight: TextStyle.w300),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w300),
                         ),
                       ),
                     ),
