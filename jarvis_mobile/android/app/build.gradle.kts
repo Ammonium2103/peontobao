@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.jarvis_mobile"
-    compileSdk = 36
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -20,8 +20,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.jarvis_mobile"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = 21
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
