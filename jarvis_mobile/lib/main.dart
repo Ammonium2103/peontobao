@@ -48,11 +48,15 @@ class JarvisHUD extends StatefulWidget {
 class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMixin {
   final _audioRecorder = AudioRecorder();
   bool _isRecording = false;
-  String _userText = "Awaiting command...";
-  String _aiText = "System Online. Standby for orders, Boss.";
+  String _userText = "Neural Standby...";
+  String _aiText = "System Standalone Online. No Proxy required, Boss.";
   
-  final String _serverUrl = "http://192.168.1.15:8000"; // SẾP NHỚ THAY IP
+  // NVIDIA & OpenAI Direct Neural Links
+  final String _nvidiaApiKey = "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";
+  final String _openaiApiKey = "sk-...."; // SẾP NHỚ THAY OPENAI KEY ĐỂ DÙNG WHISPER
+
   late Database _db;
+  List<Map<String, String>> _history = [];
   late AnimationController _controller;
 
   @override
@@ -70,10 +74,21 @@ class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMix
 
   Future<void> _initMemory() async {
     _db = await openDatabase(
-      p.join(await getDatabasesPath(), 'jarvis_hud.db'),
+      p.join(await getDatabasesPath(), 'jarvis_standalone_hud.db'),
       onCreate: (db, version) => db.execute("CREATE TABLE memory(id INTEGER PRIMARY KEY, role TEXT, content TEXT)"),
       version: 1,
     );
+    _loadHistory();
+  }
+
+  void _loadHistory() async {
+    final List<Map<String, dynamic>> maps = await _db.query('memory', orderBy: 'id DESC', limit: 6);
+    setState(() {
+      _history = List.generate(maps.length, (i) => {
+        'role': maps[i]['role'] as String,
+        'content': maps[i]['content'] as String,
+      }).reversed.toList();
+    });
   }
 
   Future<void> _launchApp(String name) async {
@@ -83,7 +98,6 @@ class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMix
       'youtube': 'https://youtube.com',
       'mess': 'https://messenger.com',
     };
-    
     String? target = apps[name.toLowerCase()];
     if (target != null) {
       final uri = Uri.parse(target);
@@ -103,11 +117,11 @@ class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMix
   Future<void> _startVoice() async {
     if (await Permission.microphone.request().isGranted) {
       final dir = await getApplicationDocumentsDirectory();
-      final path = p.join(dir.path, 'cmd.m4a');
+      final path = p.join(dir.path, 'neural_signal.m4a');
       await _audioRecorder.start(const RecordConfig(), path: path);
       setState(() {
         _isRecording = true;
-        _userText = "Listening...";
+        _userText = "Recording Neural Wave...";
       });
     }
   }
@@ -115,14 +129,18 @@ class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMix
   Future<void> _stopVoice() async {
     final path = await _audioRecorder.stop();
     setState(() => _isRecording = false);
-    if (path != null) _processVoice(path);
+    if (path != null) _processVoiceDirectly(path);
   }
 
-  Future<void> _processVoice(String path) async {
-    setState(() => _aiText = "Decoding Neural Signal...");
+  Future<void> _processVoiceDirectly(String path) async {
+    setState(() => _aiText = "Analyzing Audio Frequency...");
     try {
-      var request = http.MultipartRequest('POST', Uri.parse('$_serverUrl/stt'));
+      // Direct call to OpenAI Whisper API
+      var request = http.MultipartRequest('POST', Uri.parse('https://api.openai.com/v1/audio/transcriptions'));
+      request.headers['Authorization'] = 'Bearer $_openaiApiKey';
+      request.fields['model'] = 'whisper-1';
       request.files.add(await http.MultipartFile.fromPath('file', path));
+      
       var response = await request.send();
       var result = jsonDecode(await response.stream.bytesToString());
       String transcript = result['text'];
@@ -130,27 +148,48 @@ class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMix
       if (transcript.isNotEmpty) {
         setState(() => _userText = transcript);
         _checkShortcuts(transcript);
-        _getAIResponse(transcript);
+        _getAIDirectResponse(transcript);
       }
     } catch (e) {
-      setState(() => _aiText = "Communication Link Severed.");
+      setState(() => _aiText = "Speech Processor Offline. Use Text, Boss.");
     }
   }
 
-  Future<void> _getAIResponse(String text) async {
+  Future<void> _getAIDirectResponse(String text) async {
+    setState(() => _aiText = "Reasoning with Llama-3...");
     try {
+      final messages = [
+        {"role": "system", "content": "You are JARVIS HUD. Standalone Agent. Professional, witty, and elite. Reply in Vietnamese."},
+        ..._history,
+        {"role": "user", "content": text}
+      ];
+
       final response = await http.post(
-        Uri.parse('$_serverUrl/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'text': text}),
+        Uri.parse('https://integrate.api.nvidia.com/v1/chat/completions'),
+        headers: {
+          'Authorization': 'Bearer $_nvidiaApiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          "model": "meta/llama-3.1-70b-instruct",
+          "messages": messages,
+          "temperature": 0.5,
+        }),
       );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        setState(() => _aiText = data['response']);
-        _checkShortcuts(_aiText);
+        String aiResponse = data['choices'][0]['message']['content'];
+
+        await _db.insert('memory', {'role': 'user', 'content': text});
+        await _db.insert('memory', {'role': 'assistant', 'content': aiResponse});
+        _loadHistory();
+
+        setState(() => _aiText = aiResponse);
+        _checkShortcuts(aiResponse);
       }
     } catch (e) {
-      setState(() => _aiText = "Core Processor Error.");
+      setState(() => _aiText = "Direct Neural Link Severed.");
     }
   }
 
@@ -159,18 +198,16 @@ class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMix
     return Scaffold(
       body: Stack(
         children: [
-          // Background HUD Layer
-          Positioned.fill(child: _buildHUDBackground()),
-          
+          Positioned.fill(child: Container(decoration: BoxDecoration(gradient: RadialGradient(center: Alignment.center, colors: [JColor.secondary.withOpacity(0.05), JColor.background], radius: 1.5)))),
           Column(
             children: [
               const SizedBox(height: 60),
-              _buildTopHeader(),
+              FadeInDown(child: _buildHUDHeader()),
               const Spacer(),
-              _buildNeuralCenter(),
+              _buildNeuralOrb(),
               const Spacer(),
-              _buildConsoleBox(),
-              _buildMicButton(),
+              _buildHUDConsole(),
+              _buildNeuralTrigger(),
               const SizedBox(height: 50),
             ],
           ),
@@ -179,109 +216,59 @@ class _JarvisHUDState extends State<JarvisHUD> with SingleTickerProviderStateMix
     );
   }
 
-  Widget _buildHUDBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment.center,
-          colors: [JColor.secondary.withOpacity(0.1), JColor.background],
-          radius: 1.5,
+  Widget _buildHUDHeader() {
+    return Column(
+      children: [
+        Text("STANDALONE NEURAL LINK", style: TextStyle(color: JColor.primary.withOpacity(0.4), fontSize: 10, letterSpacing: 2)),
+        const Text("JARVIS SUPREME", style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 6, color: JColor.primary)),
+        const SizedBox(height: 5),
+        Container(height: 1, width: 150, color: JColor.primary.withOpacity(0.2)),
+      ],
+    );
+  }
+
+  Widget _buildNeuralOrb() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (_, child) => Transform.rotate(angle: _controller.value * 2 * math.pi, child: child),
+          child: Container(width: 230, height: 230, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: JColor.primary.withOpacity(0.05), width: 10))),
         ),
-      ),
+        AvatarGlow(animate: _isRecording, glowColor: JColor.primary, child: SpinKitDoubleBounce(color: JColor.primary.withOpacity(0.5), size: 160)),
+        const Icon(Icons.psychology_outlined, color: JColor.primary, size: 50),
+      ],
     );
   }
 
-  Widget _buildTopHeader() {
-    return FadeInDown(
-      child: Column(
-        children: [
-          Text("STRATEGIC DEFENSE SYSTEM", style: TextStyle(color: JColor.primary.withOpacity(0.5), fontSize: 10, letterSpacing: 2)),
-          const Text("JARVIS HUD v7.0", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 8, color: JColor.primary)),
-          const SizedBox(height: 5),
-          Container(height: 1, width: 200, color: JColor.primary.withOpacity(0.3)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNeuralCenter() {
-    return Center(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Rotating Outer Ring
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (_, child) => Transform.rotate(angle: _controller.value * 2 * math.pi, child: child),
-            child: Container(
-              width: 250, height: 250,
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: JColor.primary.withOpacity(0.1), width: 15)),
-            ),
-          ),
-          // Pulsing Core
-          AvatarGlow(
-            animate: _isRecording,
-            glowColor: JColor.primary,
-            child: SpinKitPulse(color: JColor.primary, size: 150),
-          ),
-          const Icon(Icons.shield_outlined, color: JColor.primary, size: 60),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConsoleBox() {
+  Widget _buildHUDConsole() {
     return FadeInUp(
       child: Container(
-        margin: const EdgeInsets.all(20),
+        margin: const EdgeInsets.all(25),
         padding: const EdgeInsets.all(20),
         height: 220,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: JColor.card.withOpacity(0.6),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: JColor.primary.withOpacity(0.2)),
-        ),
+        decoration: BoxDecoration(color: JColor.card.withOpacity(0.5), borderRadius: BorderRadius.circular(20), border: Border.all(color: JColor.primary.withOpacity(0.1))),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Icon(Icons.terminal, size: 14, color: JColor.primary),
-                const SizedBox(width: 8),
-                Text("NEURAL_LINK_STREAM", style: TextStyle(color: JColor.primary.withOpacity(0.7), fontSize: 10)),
-              ],
-            ),
+            Text("DATA_STREAM >> USER: $_userText", style: const TextStyle(color: JColor.primary, fontSize: 11, fontFamily: 'monospace')),
             const Divider(color: Colors.white10),
-            Text("USER >> $_userText", style: const TextStyle(color: JColor.primary, fontSize: 13, fontFamily: 'monospace')),
-            const SizedBox(height: 10),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Text(
-                  "JARVIS >> $_aiText",
-                  style: const TextStyle(color: JColor.accent, fontSize: 16, height: 1.5, fontWeight: FontWeight.w300),
-                ),
-              ),
-            ),
+            Expanded(child: SingleChildScrollView(child: Text("NEURAL_OUT >> JARVIS: $_aiText", style: const TextStyle(color: JColor.accent, fontSize: 16, height: 1.4)))),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMicButton() {
+  Widget _buildNeuralTrigger() {
     return GestureDetector(
       onTapDown: (_) => _startVoice(),
       onTapUp: (_) => _stopVoice(),
       child: Container(
-        width: 90, height: 90,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: _isRecording ? Colors.red.withOpacity(0.2) : JColor.primary.withOpacity(0.1),
-          border: Border.all(color: _isRecording ? Colors.red : JColor.primary, width: 2),
-          boxShadow: [BoxShadow(color: (_isRecording ? Colors.red : JColor.primary).withOpacity(0.3), blurRadius: 20)],
-        ),
-        child: Icon(_isRecording ? Icons.mic : Icons.mic_none, size: 40, color: _isRecording ? Colors.red : JColor.primary),
+        width: 80, height: 80,
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _isRecording ? Colors.red : JColor.primary, width: 1.5), color: _isRecording ? Colors.red.withOpacity(0.1) : Colors.transparent),
+        child: Icon(_isRecording ? Icons.mic : Icons.bolt, color: _isRecording ? Colors.red : JColor.primary, size: 35),
       ),
     );
   }
