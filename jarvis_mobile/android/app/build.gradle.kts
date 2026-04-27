@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.jarvis_mobile"
-    compileSdk = 36
+    compileSdk = 34
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -21,12 +21,9 @@ android {
     defaultConfig {
         applicationId = "com.example.jarvis_mobile"
         minSdk = 21
-        targetSdk = 35
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        
-        ndk.abiFilters.add("arm64-v8a")
-        ndk.abiFilters.add("armeabi-v7a")
     }
 
     buildTypes {

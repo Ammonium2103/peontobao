@@ -1,7 +1,7 @@
 name: jarvis_mobile
 description: Standalone Jarvis AI.
 publish_to: 'none'
-version: 3.0.0+1
+version: 4.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -10,8 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.1.0
-  speech_to_text: ^7.3.0
-  flutter_tts: ^4.2.5
+  # EP BUOC dung ban moi nhat de fix loi Registrar
+  speech_to_text: 7.3.0
+  flutter_tts: 4.2.5
   animate_do: ^3.3.4
   avatar_glow: ^3.0.1
   permission_handler: ^11.3.1
