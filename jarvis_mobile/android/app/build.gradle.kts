@@ -22,8 +22,9 @@ android {
         applicationId = "com.example.jarvis_mobile"
         minSdk = 21
         targetSdk = 34
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        // FIX: Dung cu phap ham goi cho Gradle moi
+        versionCode = flutter.versionCode()
+        versionName = flutter.versionName()
         
         multiDexEnabled = true
         
@@ -35,8 +36,9 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
-            minifyEnabled = false
-            shrinkResources = false
+            // FIX: Dung cu phap is... cho Kotlin DSL
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
