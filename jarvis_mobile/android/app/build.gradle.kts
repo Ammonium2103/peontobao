@@ -6,8 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.jarvis_mobile"
-    compileSdk = 34
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 34 // Bản ổn định nhất cho các plugin Flutter hiện tại
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -15,14 +14,15 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
         applicationId = "com.example.jarvis_mobile"
         minSdk = 21
         targetSdk = 34
-        // FIX: Dung cu phap ham goi cho Gradle moi
+        
+        // Cú pháp chuẩn cho Flutter 3.22+
         versionCode = flutter.versionCode()
         versionName = flutter.versionName()
         
@@ -36,7 +36,6 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
-            // FIX: Dung cu phap is... cho Kotlin DSL
             isMinifyEnabled = false
             isShrinkResources = false
         }
