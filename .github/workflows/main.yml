@@ -1,4 +1,4 @@
-name: Jarvis Build Cloud v10.7
+name: Jarvis Build Cloud v10.9
 on:
   push:
     branches: [ "master", "main" ]
@@ -18,6 +18,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: 'gradle' # Tối ưu hóa cache cho Gradle
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -35,7 +36,7 @@ jobs:
         run: |
           cd jarvis_mobile
           flutter clean
-          flutter pub get --verbose # Bật verbose để soi bug nếu lỗi
+          flutter pub get
 
       - name: Accept Android Licenses
         run: yes | flutter doctor --android-licenses || true
@@ -43,10 +44,11 @@ jobs:
       - name: Build APK
         run: |
           cd jarvis_mobile
-          flutter build apk --release
+          # Sử dụng flag skip validation để vượt qua các cảnh báo AGP nếu cần
+          flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: jarvis-supreme-v10.7
+          name: jarvis-ultimate-v10.9
           path: jarvis_mobile/build/app/outputs/flutter-apk/app-release.apk

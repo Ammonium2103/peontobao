@@ -5,6 +5,7 @@ plugins {
 }
 
 android {
+    // FIX: Explicitly define namespace to avoid AGP 8.0+ errors
     namespace = "com.example.jarvis_mobile"
     compileSdk = 34
 
@@ -22,7 +23,7 @@ android {
         minSdk = 21
         targetSdk = 34
         
-        // Cú pháp đúng: versionCode và versionName là thuộc tính (Property)
+        // Cú pháp chuẩn cho Gradle Kotlin DSL trong Flutter
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
@@ -36,7 +37,7 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
-            // Cú pháp đúng cho Kotlin DSL: isMinifyEnabled và isShrinkResources
+            // Cú pháp đúng cho Kotlin DSL
             isMinifyEnabled = false
             isShrinkResources = false
         }
