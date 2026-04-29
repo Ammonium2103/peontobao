@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.jarvis_mobile"
-    compileSdk = 34 // Bản ổn định nhất cho các plugin Flutter hiện tại
+    compileSdk = 34
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -22,9 +22,9 @@ android {
         minSdk = 21
         targetSdk = 34
         
-        // Cú pháp chuẩn cho Flutter 3.22+
-        versionCode = flutter.versionCode()
-        versionName = flutter.versionName()
+        // Cú pháp đúng: versionCode và versionName là thuộc tính (Property)
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
         
         multiDexEnabled = true
         
@@ -36,6 +36,7 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
+            // Cú pháp đúng cho Kotlin DSL: isMinifyEnabled và isShrinkResources
             isMinifyEnabled = false
             isShrinkResources = false
         }
