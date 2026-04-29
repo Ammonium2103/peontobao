@@ -1,4 +1,4 @@
-name: Jarvis Build Cloud v10.6
+name: Jarvis Build Cloud v10.7
 on:
   push:
     branches: [ "master", "main" ]
@@ -35,7 +35,7 @@ jobs:
         run: |
           cd jarvis_mobile
           flutter clean
-          flutter pub get
+          flutter pub get --verbose # Bật verbose để soi bug nếu lỗi
 
       - name: Accept Android Licenses
         run: yes | flutter doctor --android-licenses || true
@@ -48,5 +48,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: jarvis-supreme-v10.6
+          name: jarvis-supreme-v10.7
           path: jarvis_mobile/build/app/outputs/flutter-apk/app-release.apk
