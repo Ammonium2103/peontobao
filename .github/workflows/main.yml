@@ -1,4 +1,4 @@
-name: Jarvis Build Cloud v10.5
+name: Jarvis Build Cloud v10.6
 on:
   push:
     branches: [ "master", "main" ]
@@ -29,13 +29,13 @@ jobs:
         with:
           flutter-version: '3.22.0'
           channel: 'stable'
-          cache: true # Tối ưu hóa tốc độ build bằng cache
+          cache: true
 
       - name: Install Dependencies
         run: |
           cd jarvis_mobile
+          flutter clean
           flutter pub get
-          flutter pub upgrade --major-versions
 
       - name: Accept Android Licenses
         run: yes | flutter doctor --android-licenses || true
@@ -43,10 +43,10 @@ jobs:
       - name: Build APK
         run: |
           cd jarvis_mobile
-          flutter build apk --release --verbose
+          flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: jarvis-ultimate-v10.5
+          name: jarvis-supreme-v10.6
           path: jarvis_mobile/build/app/outputs/flutter-apk/app-release.apk
